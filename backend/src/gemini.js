@@ -12,11 +12,19 @@ const genAI = new GoogleGenerativeAI(apiKey || "");
 
 export async function summarizeText(text) {
   if (!apiKey) {
-    throw new Error("Gemini API key not configured");
+    // Return a demo summary instead of throwing an error
+    return `📝 **Demo Summary** (No API Key Configured)
+
+• This is a demonstration summary showing how the AI would respond
+• The actual Gemini AI summarization requires an API key
+• Visit https://makersuite.google.com/app/apikey to get your free API key
+• Add it to backend/.env as GEMINI_API_KEY=your_key_here
+
+**Your original text was ${text.length} characters long.**`;
   }
 
-  // Using gemini-1.5-flash as it is a stable and fast model.
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  // Using gemini-1.5-flash-latest (correct model name for the API)
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const prompt = `Summarize the following text in 3-5 concise bullet points:\n\n${text}`;
 
