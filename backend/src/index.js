@@ -6,17 +6,48 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+// Validate required environment variables
+const requiredEnvVars = ['SERVER_ADDRESS'];
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.error('❌ Missing required environment variables:', missingEnvVars.join(', '));
+  console.error('📝 Please copy .env.example to .env and configure it');
+  process.exit(1);
+}
+
+if (!process.env.GEMINI_API_KEY) {
+  console.warn('⚠️  GEMINI_API_KEY not set - using demo mode');
+}
+
 const app = new Hono();
 
-app.use("/*", cors());
+// CORS Configuration
+app.use("/*", cors({
+  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  credentials: true,
+  allowMethods: ["GET", "POST", "OPTIONS"],
+  allowHeaders: ["Content-Type", "X-Payment-Proof", "X-Payment-TxHash", "X-Payment-Network"],
+  exposeHeaders: ["X-Payment-Required"],
+}));
 
 app.get("/", (c) => {
   return c.json({ 
     status: "running",
     message: "x402 Summarizer API",
+    version: "1.0.0",
+    cors: {
+      enabled: true,
+      allowedOrigin: process.env.FRONTEND_URL || "http://localhost:5173"
+    },
     endpoints: {
       health: "GET /",
-      summarize: "POST /summarize"
+      summarize: "POST /summarize (requires payment)"
+    },
+    payment: {
+      network: x402Config.network,
+      price: x402Config.price,
+      walletAddress: x402Config.walletAddress
     }
   });
 });
@@ -90,9 +121,10 @@ app.post(
   }
 );
 
-const port = 3000;
+const port = process.env.PORT || 3000;
 console.log(`✅ Server is running on http://localhost:${port}`);
 console.log(`💰 x402 Payment Required: ${x402Config.price} on ${x402Config.network}`);
+console.log(`🌐 CORS enabled for: ${process.env.FRONTEND_URL || "http://localhost:5173"}`);
 
 serve({
   fetch: app.fetch,

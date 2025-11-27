@@ -102,15 +102,28 @@ cd backend
 npm install
 ```
 
-3. Create a `.env` file with your configuration:
-```env
-GEMINI_API_KEY=your_gemini_api_key
-SERVER_ADDRESS=your_wallet_address
-FACILITATOR_URL=https://x402-facilitator-url
-PRICE_USD=0.01
-NETWORK_NAME=sei-testnet
-PORT=3000
+3. Copy the example environment file and configure it:
+```bash
+cp .env.example .env
 ```
+
+Edit `.env` with your configuration:
+```env
+# Server Configuration
+PORT=3000
+FRONTEND_URL=http://localhost:5173
+
+# Gemini AI Configuration
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# x402 Payment Configuration
+SERVER_ADDRESS=your_wallet_address_here
+PRICE_USD=0.01
+FACILITATOR_URL=https://facilitator.x402.org
+NETWORK_NAME=sei-testnet
+```
+
+Get your Gemini API key from: https://ai.google.dev/
 
 4. Start the server:
 ```bash
@@ -129,7 +142,12 @@ cd frontend
 npm install
 ```
 
-3. Create a `.env` file:
+3. Copy the example environment file and configure it:
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your configuration:
 ```env
 VITE_BACKEND_URL=http://localhost:3000
 ```
@@ -162,6 +180,35 @@ npm run dev
 
 - **Sei Testnet**: https://atlantic-2.app.sei.io/faucet
 - **Sepolia Testnet**: https://sepoliafaucet.com
+
+## Troubleshooting
+
+### CORS Issues
+
+If you encounter CORS errors:
+
+1. **Check backend .env**: Ensure `FRONTEND_URL` matches your frontend URL
+   ```env
+   FRONTEND_URL=http://localhost:5173
+   ```
+
+2. **Check frontend .env**: Ensure `VITE_BACKEND_URL` matches your backend URL
+   ```env
+   VITE_BACKEND_URL=http://localhost:3000
+   ```
+
+3. **Restart both servers** after changing environment variables
+
+4. **For production**: Update `FRONTEND_URL` to your deployed frontend domain
+   ```env
+   FRONTEND_URL=https://your-app.vercel.app
+   ```
+
+### Payment Issues
+
+- Make sure you have testnet tokens in your wallet
+- Check that you're connected to the correct network (Sei or Sepolia)
+- Verify your wallet is unlocked and connected to the site
 
 ## API Endpoints
 
