@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Sparkles, Loader2, AlertCircle, Wallet, CheckCircle, Network, Zap, Brain, Lock, Rocket, Stars, TrendingUp } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Sparkles, AlertCircle, Wallet, CheckCircle, Network, Zap, Brain, Lock, Rocket, Stars, TrendingUp } from 'lucide-react';
 import './Summarizer.css';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
@@ -257,7 +257,11 @@ export default function Summarizer() {
           <Sparkles className="header-icon" />
           <h1 className="header-title">x402</h1>
         </div>
-        <p className="header-subtitle">Next-Gen AI Summarization • Blockchain Powered</p>
+        <p className="header-subtitle">HTTP 402 Payment Protocol Demo</p>
+        <div className="header-description">
+          <p>This project demonstrates the HTTP 402 "Payment Required" status code in action.</p>
+          <p>Pay-per-use AI summarization powered by blockchain micropayments.</p>
+        </div>
       </div>
 
       {/* Main Card */}
@@ -315,7 +319,7 @@ export default function Summarizer() {
 
               {/* Stage indicators */}
               <div className="stage-indicators">
-                {LOADING_STAGES.slice(0, -1).map((stage, index) => (
+                {LOADING_STAGES.slice(0, -1).map((_, index) => (
                   <div
                     key={index}
                     className={`stage-dot ${loadingStage >= index ? 'active' : ''}`}
@@ -439,6 +443,17 @@ export default function Summarizer() {
 
       {/* Footer */}
       <div className="footer">
+        <div className="footer-info">
+          <h3>About HTTP 402</h3>
+          <p>
+            HTTP 402 is a reserved status code for future payment systems. This demo implements 
+            the x402 protocol, enabling seamless blockchain-based micropayments for API access.
+          </p>
+          <p>
+            When you request a summary, the server responds with 402 Payment Required. Your wallet 
+            automatically handles the payment, and the request is retried with proof of payment.
+          </p>
+        </div>
         <p className="footer-text">
           Powered by <span className="footer-highlight">Gemini AI</span> + <span className="footer-highlight">x402 Protocol</span>
         </p>
