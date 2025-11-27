@@ -1,0 +1,12 @@
+import { serve } from "@hono/node-server";
+console.log("hono/node-server ok");
+import { Hono } from "hono";
+console.log("hono ok");
+import { cors } from "hono/cors";
+console.log("hono/cors ok");
+import dotenv from "dotenv";
+console.log("dotenv ok");
+import { paymentRequired } from "x402-hono";
+console.log("x402-hono ok");
+import { summarizeText } from "./src/gemini.js";
+console.log("gemini ok");
