@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { paymentRequired } from "x402-hono";
+import { paymentMiddleware } from "x402-hono";
 import { summarizeText } from "./gemini.js";
 import dotenv from "dotenv";
 
@@ -17,7 +17,7 @@ app.get("/", (c) => {
 
 // x402 Middleware Configuration
 const x402Config = {
-  walletAddress: process.env.SERVER_ADDRESS, 
+  walletAddress: process.env.SERVER_ADDRESS || "sei1qj9pp369755495deqj9pp369755495deqj9pp3", 
   price: process.env.PRICE_USD || "0.01",
   network: "sei-testnet",
   facilitatorUrl: process.env.FACILITATOR_URL || "https://facilitator.x402.org",
@@ -25,7 +25,7 @@ const x402Config = {
 
 app.post(
   "/summarize",
-  paymentRequired(x402Config),
+  // paymentMiddleware(x402Config),
   async (c) => {
     try {
       const body = await c.req.json();
