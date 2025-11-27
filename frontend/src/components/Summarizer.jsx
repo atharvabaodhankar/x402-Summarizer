@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
+import { Sparkles, Loader2, AlertCircle, Wallet } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
@@ -8,6 +8,8 @@ export default function Summarizer() {
   const [summary, setSummary] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [paymentRequired, setPaymentRequired] = useState(false);
+  const [paymentInfo, setPaymentInfo] = useState(null);
 
   const handleSummarize = async () => {
     if (!text.trim()) {
@@ -18,6 +20,7 @@ export default function Summarizer() {
     setLoading(true);
     setError('');
     setSummary('');
+    setPaymentRequired(false);
 
     try {
       const response = await fetch(`${BACKEND_URL}/summarize`, {
@@ -30,6 +33,14 @@ export default function Summarizer() {
 
       const data = await response.json();
 
+      // Check for 402 Payment Required
+      if (response.status === 402) {
+        setPaymentRequired(true);
+        setPaymentInfo(data);
+        setError(`💰 Payment Required: ${data.price || '$0.01'} on Sei Testnet. Please connect your wallet to continue.`);
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(data.error || 'Failed to summarize');
       }
@@ -40,6 +51,10 @@ export default function Summarizer() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleWalletConnect = async () => {
+    setError('🔗 Wallet integration coming soon! For now, the x402 middleware is detecting payment requirements. To enable full wallet flow, you would need to integrate @cosmos-kit/react or Keplr/Leap wallet providers.');
   };
 
   return (
@@ -54,6 +69,9 @@ export default function Summarizer() {
         </div>
         <p className="text-purple-200 text-lg">
           Powered by Gemini AI on Sei Testnet
+        </p>
+        <p className="text-purple-300 text-sm mt-2">
+          ⚡ Pay-per-use with x402 Protocol
         </p>
       </div>
 
@@ -93,8 +111,28 @@ export default function Summarizer() {
           )}
         </button>
 
+        {/* Payment Required Notice */}
+        {paymentRequired && (
+          <div className="mt-6 bg-yellow-500/20 backdrop-blur border border-yellow-500/50 rounded-xl p-6">
+            <h3 className="text-yellow-200 text-xl font-semibold mb-3 flex items-center gap-2">
+              <Wallet className="w-6 h-6" />
+              Payment Required on Sei Testnet
+            </h3>
+            <p className="text-yellow-100 mb-4">
+              Price: <strong>{paymentInfo?.price || '$0.01'}</strong>
+            </p>
+            <button
+              onClick={handleWalletConnect}
+              className="w-full bg-gradient-to-r from-green-400 to-blue-500 text-white font-bold py-3 px-6 rounded-xl hover:from-green-500 hover:to-blue-600 transition-all duration-300 flex items-center justify-center gap-2"
+            >
+              <Wallet className="w-5 h-5" />
+              Connect Wallet & Pay
+            </button>
+          </div>
+        )}
+
         {/* Error Message */}
-        {error && (
+        {error && !paymentRequired && (
           <div className="mt-6 bg-red-500/20 backdrop-blur border border-red-500/50 rounded-xl p-4 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-300 flex-shrink-0 mt-0.5" />
             <p className="text-red-100">{error}</p>
@@ -117,7 +155,7 @@ export default function Summarizer() {
 
       {/* Footer */}
       <div className="text-center mt-8 text-purple-200 text-sm">
-        <p>Built with React + Hono + Gemini AI</p>
+        <p>Built with React + Hono + Gemini AI + x402 Protocol</p>
       </div>
     </div>
   );

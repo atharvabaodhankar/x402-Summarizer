@@ -10,6 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@cosmos-kit/keplr": "^2.15.9",
+    "@cosmos-kit/leap": "^2.15.8",
+    "@cosmos-kit/react": "^2.22.7",
     "@tailwindcss/vite": "^4.1.17",
     "lucide-react": "^0.555.0",
     "react": "^19.2.0",
