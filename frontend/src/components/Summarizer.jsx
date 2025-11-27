@@ -1,16 +1,52 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Loader2, AlertCircle, Wallet, CheckCircle, Network, Zap } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import { Sparkles, Loader2, AlertCircle, Wallet, CheckCircle, Network, Zap, Brain, Lock, Rocket, Stars, TrendingUp } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
-const QUOTES = [
-  "Connecting to blockchain...",
-  "Securing transaction...",
-  "Processing with AI...",
-  "Almost there...",
-  "Verifying payment...",
-  "Creating summary..."
+const LOADING_STAGES = [
+  { 
+    icon: Network, 
+    text: "Establishing secure connection...", 
+    subtext: "Encrypting your data with military-grade security",
+    progress: 15 
+  },
+  { 
+    icon: Lock, 
+    text: "Authenticating blockchain network...", 
+    subtext: "Verifying smart contract integrity",
+    progress: 30 
+  },
+  { 
+    icon: Brain, 
+    text: "AI models warming up...", 
+    subtext: "Loading neural networks for optimal processing",
+    progress: 45 
+  },
+  { 
+    icon: Sparkles, 
+    text: "Analyzing your content...", 
+    subtext: "Processing 10,000+ tokens per second",
+    progress: 60 
+  },
+  { 
+    icon: TrendingUp, 
+    text: "Optimizing summary quality...", 
+    subtext: "Applying advanced NLP algorithms",
+    progress: 75 
+  },
+  { 
+    icon: Rocket, 
+    text: "Finalizing your summary...", 
+    subtext: "Almost there! Polishing the results",
+    progress: 90 
+  },
+  { 
+    icon: Stars, 
+    text: "Complete!", 
+    subtext: "Your summary is ready",
+    progress: 100 
+  }
 ];
 
 const NETWORKS = {
@@ -42,34 +78,59 @@ export default function Summarizer() {
   const [paymentRequired, setPaymentRequired] = useState(false);
   const [paymentInfo, setPaymentInfo] = useState(null);
   const [selectedNetwork, setSelectedNetwork] = useState('sei');
-  const [currentQuote, setCurrentQuote] = useState(0);
+  const [loadingStage, setLoadingStage] = useState(0);
   const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState('');
+  const [charCount, setCharCount] = useState(0);
+  const textareaRef = useRef(null);
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
 
   const currentNetwork = NETWORKS[selectedNetwork];
+  const currentStage = LOADING_STAGES[loadingStage];
 
+  // Smooth progress animation
   useEffect(() => {
-    if (loading) {
+    if (loading && loadingStage < LOADING_STAGES.length - 1) {
+      const targetProgress = LOADING_STAGES[loadingStage].progress;
       const interval = setInterval(() => {
-        setCurrentQuote(prev => (prev + 1) % QUOTES.length);
-      }, 2500);
+        setProgress(prev => {
+          if (prev >= targetProgress) {
+            return prev;
+          }
+          return Math.min(prev + 1, targetProgress);
+        });
+      }, 50);
       return () => clearInterval(interval);
     }
-  }, [loading]);
+  }, [loading, loadingStage]);
 
+  // Stage progression
   useEffect(() => {
-    if (loading) {
-      setProgress(0);
-      const interval = setInterval(() => {
-        setProgress(prev => prev >= 90 ? prev : prev + Math.random() * 10);
-      }, 400);
-      return () => clearInterval(interval);
+    if (loading && loadingStage < LOADING_STAGES.length - 1) {
+      const duration = loadingStage === 0 ? 1500 : 2000;
+      const timer = setTimeout(() => {
+        setLoadingStage(prev => prev + 1);
+      }, duration);
+      return () => clearTimeout(timer);
     }
-  }, [loading]);
+  }, [loading, loadingStage]);
+
+  // Mouse tracking for interactive effects
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    mouseX.set(e.clientX - rect.left);
+    mouseY.set(e.clientY - rect.top);
+  };
+
+  const handleTextChange = (e) => {
+    setText(e.target.value);
+    setCharCount(e.target.value.length);
+  };
 
   const handleSummarize = async () => {
     if (!text.trim()) {
-      setError('Please enter text');
+      setError('Please enter some text to summarize');
+      setTimeout(() => setError(''), 3000);
       return;
     }
 
@@ -77,7 +138,8 @@ export default function Summarizer() {
     setError('');
     setSummary('');
     setPaymentRequired(false);
-    setStatus('Sending request...');
+    setLoadingStage(0);
+    setProgress(0);
 
     try {
       const response = await fetch(`${BACKEND_URL}/summarize`, {
@@ -91,39 +153,42 @@ export default function Summarizer() {
       if (response.status === 402) {
         setPaymentRequired(true);
         setPaymentInfo(data);
+        setLoadingStage(LOADING_STAGES.length - 1);
         setProgress(100);
+        setLoading(false);
         return;
       }
 
-      if (!response.ok) throw new Error(data.error || 'Failed');
+      if (!response.ok) throw new Error(data.error || 'Failed to generate summary');
 
+      // Complete the loading animation
+      setLoadingStage(LOADING_STAGES.length - 1);
       setProgress(100);
+      
+      await new Promise(r => setTimeout(r, 800));
       setSummary(data.summary);
     } catch (err) {
       setError(err.message);
     } finally {
       setTimeout(() => {
         setLoading(false);
-        setStatus('');
-      }, 300);
+      }, 500);
     }
   };
 
   const handleWalletConnect = async () => {
     setLoading(true);
     setError('');
+    setLoadingStage(0);
     setProgress(0);
 
     try {
-      if (!window.ethereum) throw new Error('Install MetaMask');
+      if (!window.ethereum) throw new Error('Please install MetaMask to continue');
 
-      setStatus('Connecting MetaMask...');
-      setProgress(10);
-      
+      setLoadingStage(1);
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      setProgress(25);
-
-      setStatus(`Switching to ${currentNetwork.chainName}...`);
+      
+      setLoadingStage(2);
       try {
         await window.ethereum.request({
           method: 'wallet_switchEthereumChain',
@@ -137,9 +202,8 @@ export default function Summarizer() {
           });
         } else throw switchError;
       }
-      setProgress(50);
 
-      setStatus('Approve transaction in MetaMask...');
+      setLoadingStage(3);
       const txHash = await window.ethereum.request({
         method: 'eth_sendTransaction',
         params: [{
@@ -149,10 +213,9 @@ export default function Summarizer() {
           gas: '0x5208',
         }],
       });
-      setProgress(75);
 
-      setStatus('Getting summary...');
-      await new Promise(r => setTimeout(r, 1500));
+      setLoadingStage(4);
+      await new Promise(r => setTimeout(r, 1000));
 
       const response = await fetch(`${BACKEND_URL}/summarize`, {
         method: 'POST',
@@ -165,152 +228,350 @@ export default function Summarizer() {
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed');
+      if (!response.ok) throw new Error(data.error || 'Failed to generate summary');
 
+      setLoadingStage(LOADING_STAGES.length - 1);
       setProgress(100);
+      await new Promise(r => setTimeout(r, 800));
+      
       setPaymentRequired(false);
       setSummary(data.summary);
-      setStatus('Success! ✨');
-      setTimeout(() => setStatus(''), 2000);
       
     } catch (err) {
       setError(err.message);
     } finally {
-      setTimeout(() => setLoading(false), 300);
+      setTimeout(() => setLoading(false), 500);
     }
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <div className="w-full max-w-5xl mx-auto" onMouseMove={handleMouseMove}>
+      {/* Animated Background Orbs */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <motion.div
+          className="absolute w-96 h-96 bg-purple-500/30 rounded-full blur-3xl"
+          animate={{
+            x: [0, 100, 0],
+            y: [0, -100, 0],
+            scale: [1, 1.2, 1],
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+          style={{ top: '10%', left: '10%' }}
+        />
+        <motion.div
+          className="absolute w-96 h-96 bg-pink-500/30 rounded-full blur-3xl"
+          animate={{
+            x: [0, -100, 0],
+            y: [0, 100, 0],
+            scale: [1, 1.3, 1],
+          }}
+          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+          style={{ bottom: '10%', right: '10%' }}
+        />
+      </div>
+
       {/* Header */}
       <motion.div 
-        initial={{ opacity: 0, y: -20 }}
+        initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-8"
+        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        className="text-center mb-12 relative z-10"
       >
-        <div className="flex items-center justify-center gap-3 mb-3">
-          <Sparkles className="w-12 h-12 text-yellow-300" />
-          <h1 className="text-6xl font-black text-white">x402</h1>
-        </div>
-        <p className="text-purple-200">AI Summarization • Pay-per-use</p>
+        <motion.div 
+          className="flex items-center justify-center gap-4 mb-4"
+          whileHover={{ scale: 1.05 }}
+          transition={{ type: "spring", stiffness: 400, damping: 10 }}
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          >
+            <Sparkles className="w-14 h-14 text-yellow-300 drop-shadow-glow" />
+          </motion.div>
+          <h1 className="text-7xl font-black bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
+            x402
+          </h1>
+        </motion.div>
+        <motion.p 
+          className="text-xl text-purple-100/80 font-medium"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          Next-Gen AI Summarization • Blockchain Powered
+        </motion.p>
       </motion.div>
 
       {/* Main Card */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/20"
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        className="bg-white/5 backdrop-blur-2xl rounded-[2rem] p-10 shadow-2xl border border-white/10 relative overflow-hidden"
+        style={{
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)'
+        }}
       >
+        {/* Glassmorphism shine effect */}
+        <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent pointer-events-none" />
         {/* Network Selector */}
-        <div className="mb-6">
-          <label className="flex items-center gap-2 text-white text-sm font-medium mb-3">
-            <Network className="w-4 h-4" />
-            Payment Network
+        <div className="mb-8 relative z-10">
+          <label className="flex items-center gap-2 text-white/90 text-sm font-semibold mb-4 tracking-wide">
+            <Network className="w-5 h-5" />
+            PAYMENT NETWORK
           </label>
-          <div className="grid grid-cols-2 gap-3">
-            {Object.keys(NETWORKS).map(key => (
-              <button
+          <div className="grid grid-cols-2 gap-4">
+            {Object.keys(NETWORKS).map((key, index) => (
+              <motion.button
                 key={key}
                 onClick={() => setSelectedNetwork(key)}
                 disabled={loading}
-                className={`p-4 rounded-xl font-semibold transition-all ${
+                whileHover={{ scale: 1.02, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className={`relative p-5 rounded-2xl font-bold transition-all duration-300 overflow-hidden ${
                   selectedNetwork === key
-                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg'
-                    : 'bg-white/10 text-gray-300 hover:bg-white/20'
+                    ? 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 text-white shadow-2xl'
+                    : 'bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10'
                 }`}
               >
-                {NETWORKS[key].chainName.split(' ')[0]}
-              </button>
+                {selectedNetwork === key && (
+                  <motion.div
+                    layoutId="network-selector"
+                    className="absolute inset-0 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500"
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  {selectedNetwork === key && <CheckCircle className="w-5 h-5" />}
+                  {NETWORKS[key].chainName.split(' ')[0]}
+                </span>
+              </motion.button>
             ))}
           </div>
         </div>
 
-        {/* Loading Progress */}
-        <AnimatePresence>
-          {loading && (
+        {/* Cinematic Loading Progress */}
+        <AnimatePresence mode="wait">
+          {loading && currentStage && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mb-6"
+              initial={{ opacity: 0, scale: 0.95, y: -20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -20 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="mb-8 relative z-10"
             >
-              <div className="bg-blue-500/20 backdrop-blur rounded-xl p-5 border border-blue-500/30">
-                <div className="flex items-center gap-3 mb-3">
-                  <Loader2 className="w-5 h-5 text-blue-400 animate-spin" />
-                  <motion.p
-                    key={currentQuote}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-white font-medium"
-                  >
-                    {QUOTES[currentQuote]}
-                  </motion.p>
+              <div className="bg-gradient-to-br from-blue-500/20 via-purple-500/20 to-pink-500/20 backdrop-blur-xl rounded-3xl p-8 border border-white/20 shadow-2xl overflow-hidden">
+                {/* Animated background gradient */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10"
+                  animate={{
+                    x: ['-100%', '100%'],
+                  }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                />
+                
+                <div className="relative z-10">
+                  {/* Icon and main text */}
+                  <div className="flex items-start gap-4 mb-6">
+                    <motion.div
+                      animate={{ 
+                        rotate: [0, 360],
+                        scale: [1, 1.1, 1]
+                      }}
+                      transition={{ 
+                        rotate: { duration: 3, repeat: Infinity, ease: "linear" },
+                        scale: { duration: 2, repeat: Infinity, ease: "easeInOut" }
+                      }}
+                      className="p-3 bg-white/10 rounded-2xl backdrop-blur"
+                    >
+                      {currentStage.icon && <currentStage.icon className="w-7 h-7 text-white" />}
+                    </motion.div>
+                    
+                    <div className="flex-1">
+                      <motion.h3
+                        key={currentStage.text}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="text-xl font-bold text-white mb-2"
+                      >
+                        {currentStage.text}
+                      </motion.h3>
+                      <motion.p
+                        key={currentStage.subtext}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.1 }}
+                        className="text-sm text-purple-200/80"
+                      >
+                        {currentStage.subtext}
+                      </motion.p>
+                    </div>
+
+                    <motion.div
+                      animate={{ opacity: [0.5, 1, 0.5] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      className="text-3xl font-black text-white/90"
+                    >
+                      {Math.round(progress)}%
+                    </motion.div>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="relative h-3 bg-black/30 rounded-full overflow-hidden">
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"
+                      initial={{ width: '0%' }}
+                      animate={{ width: `${progress}%` }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
+                    />
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                      animate={{ x: ['-100%', '200%'] }}
+                      transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                    />
+                  </div>
+
+                  {/* Stage indicators */}
+                  <div className="flex justify-between mt-4 px-1">
+                    {LOADING_STAGES.slice(0, -1).map((stage, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ scale: 0 }}
+                        animate={{ 
+                          scale: loadingStage >= index ? 1 : 0.7,
+                          opacity: loadingStage >= index ? 1 : 0.3
+                        }}
+                        className={`w-2 h-2 rounded-full ${
+                          loadingStage >= index 
+                            ? 'bg-gradient-to-r from-purple-400 to-pink-400' 
+                            : 'bg-white/20'
+                        }`}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500"
-                    animate={{ width: `${progress}%` }}
-                    transition={{ duration: 0.3 }}
-                  />
-                </div>
-                {status && (
-                  <p className="text-gray-300 text-sm mt-2">{status}</p>
-                )}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Text Area */}
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Paste your text here..."
-          disabled={loading}
-          className="w-full h-48 px-4 py-3 mb-4 bg-white/10 text-white placeholder-gray-400 border-2 border-white/20 rounded-xl focus:border-purple-400 focus:outline-none resize-none"
-        />
+        {/* Text Area with Character Counter */}
+        <div className="mb-6 relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="relative"
+          >
+            <textarea
+              ref={textareaRef}
+              value={text}
+              onChange={handleTextChange}
+              placeholder="Paste your text here and watch the magic happen..."
+              disabled={loading}
+              className="w-full h-56 px-6 py-5 bg-black/20 text-white placeholder-gray-400/60 border-2 border-white/10 rounded-2xl focus:border-purple-400/50 focus:outline-none resize-none transition-all duration-300 backdrop-blur-sm font-medium text-lg leading-relaxed"
+              style={{
+                boxShadow: 'inset 0 2px 10px rgba(0, 0, 0, 0.3)'
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: charCount > 0 ? 1 : 0 }}
+              className="absolute bottom-4 right-4 px-3 py-1 bg-white/10 backdrop-blur-md rounded-lg border border-white/20"
+            >
+              <span className="text-sm font-semibold text-purple-200">
+                {charCount.toLocaleString()} characters
+              </span>
+            </motion.div>
+          </motion.div>
+        </div>
 
         {/* Submit Button */}
-        <button
+        <motion.button
           onClick={handleSummarize}
           disabled={loading || !text.trim()}
-          className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white font-bold py-4 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          whileHover={{ scale: 1.02, y: -2 }}
+          whileTap={{ scale: 0.98 }}
+          className="relative w-full bg-gradient-to-r from-yellow-400 via-orange-500 to-pink-500 hover:from-yellow-500 hover:via-orange-600 hover:to-pink-600 text-white font-black py-5 rounded-2xl transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-3 overflow-hidden group shadow-2xl mb-6"
+          style={{
+            boxShadow: '0 10px 40px rgba(251, 191, 36, 0.3)'
+          }}
         >
-          <Zap className="w-5 h-5" />
-          Summarize with AI
-        </button>
+          <motion.div
+            className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0"
+            animate={{ x: ['-200%', '200%'] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          />
+          <Zap className="w-6 h-6 relative z-10" />
+          <span className="text-lg relative z-10">Summarize with AI</span>
+        </motion.button>
 
         {/* Payment Required */}
         <AnimatePresence>
           {paymentRequired && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-6 bg-yellow-500/20 backdrop-blur rounded-xl p-6 border border-yellow-500/30"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -20 }}
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+              className="relative overflow-hidden"
             >
-              <div className="flex items-center gap-2 mb-3">
-                <Wallet className="w-6 h-6 text-yellow-400" />
-                <h3 className="text-xl font-bold text-white">Payment Required</h3>
+              <div className="bg-gradient-to-br from-yellow-500/20 via-orange-500/20 to-pink-500/20 backdrop-blur-xl rounded-3xl p-8 border border-yellow-400/30 shadow-2xl">
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 via-orange-500/10 to-pink-500/10"
+                  animate={{ rotate: [0, 360] }}
+                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                />
+                
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-4">
+                    <motion.div
+                      animate={{ scale: [1, 1.1, 1] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      className="p-3 bg-yellow-400/20 rounded-2xl"
+                    >
+                      <Wallet className="w-7 h-7 text-yellow-300" />
+                    </motion.div>
+                    <div>
+                      <h3 className="text-2xl font-black text-white">Payment Required</h3>
+                      <p className="text-yellow-200/70 text-sm">Unlock your AI-powered summary</p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-black/30 rounded-2xl p-5 mb-5 border border-yellow-400/20">
+                    <p className="text-gray-300 text-sm mb-2">Amount</p>
+                    <p className="text-3xl font-black text-transparent bg-gradient-to-r from-yellow-300 to-orange-400 bg-clip-text">
+                      0.01 {currentNetwork.nativeCurrency.symbol}
+                    </p>
+                  </div>
+                  
+                  <motion.button
+                    onClick={handleWalletConnect}
+                    disabled={loading}
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full bg-gradient-to-r from-green-400 via-emerald-500 to-teal-500 hover:from-green-500 hover:via-emerald-600 hover:to-teal-600 text-white font-black py-4 rounded-2xl transition-all flex items-center justify-center gap-3 shadow-xl mb-4"
+                    style={{ boxShadow: '0 10px 40px rgba(52, 211, 153, 0.3)' }}
+                  >
+                    <Wallet className="w-6 h-6" />
+                    <span className="text-lg">Connect MetaMask & Pay</span>
+                  </motion.button>
+                  
+                  <motion.a
+                    href={currentNetwork.faucet}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    whileHover={{ x: 5 }}
+                    className="flex items-center justify-center gap-2 text-blue-300 hover:text-blue-200 text-sm font-semibold"
+                  >
+                    <span>Need testnet tokens?</span>
+                    <span>→</span>
+                  </motion.a>
+                </div>
               </div>
-              <p className="text-gray-300 mb-4">
-                Amount: <span className="text-yellow-400 font-bold">0.01 {currentNetwork.nativeCurrency.symbol}</span>
-              </p>
-              <button
-                onClick={handleWalletConnect}
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-green-400 to-blue-500 hover:from-green-500 hover:to-blue-600 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2"
-              >
-                <Wallet className="w-5 h-5" />
-                Connect MetaMask & Pay
-              </button>
-              <a
-                href={currentNetwork.faucet}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-300 hover:text-blue-200 text-sm mt-3 block text-center"
-              >
-                Need tokens? Get them here →
-              </a>
             </motion.div>
           )}
         </AnimatePresence>
@@ -319,12 +580,19 @@ export default function Summarizer() {
         <AnimatePresence>
           {error && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="mt-4 bg-red-500/20 rounded-xl p-4 border border-red-500/30 flex items-center gap-2"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.3 }}
+              className="bg-red-500/20 backdrop-blur-xl rounded-2xl p-5 border border-red-400/30 flex items-center gap-3 shadow-xl"
             >
-              <AlertCircle className="w-5 h-5 text-red-400" />
-              <p className="text-red-200">{error}</p>
+              <motion.div
+                animate={{ rotate: [0, 10, -10, 0] }}
+                transition={{ duration: 0.5, repeat: 3 }}
+              >
+                <AlertCircle className="w-6 h-6 text-red-400" />
+              </motion.div>
+              <p className="text-red-100 font-medium">{error}</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -333,26 +601,101 @@ export default function Summarizer() {
         <AnimatePresence>
           {summary && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-6 bg-green-500/20 backdrop-blur rounded-xl p-6 border border-green-500/30"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="relative overflow-hidden"
             >
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle className="w-6 h-6 text-green-400" />
-                <h3 className="text-xl font-bold text-white">Summary</h3>
+              <div className="bg-gradient-to-br from-green-500/20 via-emerald-500/20 to-teal-500/20 backdrop-blur-xl rounded-3xl p-8 border border-green-400/30 shadow-2xl">
+                {/* Success particles effect */}
+                {[...Array(5)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute w-2 h-2 bg-green-400 rounded-full"
+                    initial={{ opacity: 1, scale: 0, x: '50%', y: '50%' }}
+                    animate={{
+                      opacity: [1, 0],
+                      scale: [0, 1],
+                      x: `${50 + Math.cos(i * 72 * Math.PI / 180) * 100}%`,
+                      y: `${50 + Math.sin(i * 72 * Math.PI / 180) * 100}%`,
+                    }}
+                    transition={{ duration: 1, delay: i * 0.1 }}
+                  />
+                ))}
+                
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-5">
+                    <motion.div
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                      className="p-3 bg-green-400/20 rounded-2xl"
+                    >
+                      <CheckCircle className="w-7 h-7 text-green-300" />
+                    </motion.div>
+                    <div>
+                      <h3 className="text-2xl font-black text-white">Your Summary</h3>
+                      <p className="text-green-200/70 text-sm">AI-generated in seconds</p>
+                    </div>
+                  </div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="bg-black/30 rounded-2xl p-6 border border-green-400/20"
+                  >
+                    <p className="text-gray-100 leading-relaxed text-lg whitespace-pre-wrap">
+                      {summary}
+                    </p>
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                    className="flex gap-3 mt-5"
+                  >
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => navigator.clipboard.writeText(summary)}
+                      className="flex-1 bg-white/10 hover:bg-white/20 text-white font-semibold py-3 rounded-xl transition-all border border-white/20"
+                    >
+                      Copy
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        setText('');
+                        setSummary('');
+                        setCharCount(0);
+                      }}
+                      className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 rounded-xl transition-all"
+                    >
+                      New Summary
+                    </motion.button>
+                  </motion.div>
+                </div>
               </div>
-              <p className="text-gray-200 leading-relaxed whitespace-pre-wrap">
-                {summary}
-              </p>
             </motion.div>
           )}
         </AnimatePresence>
       </motion.div>
 
       {/* Footer */}
-      <p className="text-center mt-6 text-purple-200 text-sm">
-        Powered by Gemini AI + x402 Protocol
-      </p>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5 }}
+        className="text-center mt-8 relative z-10"
+      >
+        <p className="text-purple-200/60 text-sm font-medium">
+          Powered by <span className="text-purple-100 font-bold">Gemini AI</span> + <span className="text-pink-100 font-bold">x402 Protocol</span>
+        </p>
+      </motion.div>
     </div>
   );
 }
