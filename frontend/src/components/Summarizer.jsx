@@ -3,6 +3,19 @@ import { Sparkles, Loader2, AlertCircle, Wallet, CheckCircle } from 'lucide-reac
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
+// Sei Testnet EVM Configuration
+const SEI_TESTNET_EVM = {
+  chainId: '0x531', // 1329 in hex (Sei Atlantic-2 Testnet)
+  chainName: 'Sei Testnet',
+  nativeCurrency: {
+    name: 'SEI',
+    symbol: 'SEI',
+    decimals: 18
+  },
+  rpcUrls: ['https://evm-rpc-testnet.sei-apis.com'],
+  blockExplorerUrls: ['https://seitrace.com']
+};
+
 export default function Summarizer() {
   const [text, setText] = useState('');
   const [summary, setSummary] = useState('');
@@ -57,65 +70,66 @@ export default function Summarizer() {
   const handleWalletConnect = async () => {
     setLoading(true);
     setError('');
-    setWalletStatus('Detecting wallet...');
+    setWalletStatus('Detecting MetaMask...');
 
     try {
-      // Check if Keplr is installed
-      if (!window.keplr && !window.leap) {
-        throw new Error('Please install Keplr or Leap wallet extension');
+      // Check if MetaMask is installed
+      if (!window.ethereum) {
+        throw new Error('Please install MetaMask wallet extension');
       }
 
-      const wallet = window.keplr || window.leap;
-      setWalletStatus('Connecting to Sei Testnet...');
+      setWalletStatus('Connecting to MetaMask...');
 
-      // Enable Sei Testnet
-      const chainId = 'atlantic-2'; // Sei Testnet
-      
-      try {
-        await wallet.enable(chainId);
-      } catch (e) {
-        // If chain not found, suggest adding it
-        throw new Error('Please add Sei Testnet to your wallet. Chain ID: atlantic-2');
-      }
-
-      setWalletStatus('Getting wallet address...');
-      const offlineSigner = await wallet.getOfflineSigner(chainId);
-      const accounts = await offlineSigner.getAccounts();
-      const senderAddress = accounts[0].address;
+      // Request account access
+      const accounts = await window.ethereum.request({ 
+        method: 'eth_requestAccounts' 
+      });
+      const senderAddress = accounts[0];
 
       setWalletStatus(`Connected: ${senderAddress.slice(0, 10)}...`);
 
-      // Create payment transaction
-      setWalletStatus('Preparing payment transaction...');
-      
-      const recipient = paymentInfo.walletAddress;
-      const amount = '10000'; // 0.01 SEI in usei (smallest unit)
-
-      setWalletStatus('Please approve transaction in your wallet...');
-
-      // Sign and broadcast transaction
-      const tx = await wallet.signAndBroadcast(
-        chainId,
-        senderAddress,
-        [{
-          typeUrl: '/cosmos.bank.v1beta1.MsgSend',
-          value: {
-            fromAddress: senderAddress,
-            toAddress: recipient,
-            amount: [{
-              denom: 'usei',
-              amount: amount,
-            }],
-          },
-        }],
-        {
-          amount: [{ denom: 'usei', amount: '5000' }],
-          gas: '200000',
+      // Try to switch to Sei Testnet, or add it if not present
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: SEI_TESTNET_EVM.chainId }],
+        });
+      } catch (switchError) {
+        // Chain not added, let's add it
+        if (switchError.code === 4902) {
+          setWalletStatus('Adding Sei Testnet to MetaMask...');
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [SEI_TESTNET_EVM],
+          });
+        } else {
+          throw switchError;
         }
-      );
+      }
 
-      const txHash = tx.transactionHash;
+      setWalletStatus('Preparing payment transaction...');
+
+      const recipient = paymentInfo.walletAddress;
+      // 0.01 SEI in wei (18 decimals)
+      const amountWei = '0x2386F26FC10000'; // 0.01 SEI
+
+      setWalletStatus('Please approve transaction in MetaMask...');
+
+      // Send transaction
+      const txHash = await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: senderAddress,
+          to: recipient,
+          value: amountWei,
+          gas: '0x5208', // 21000 in hex
+        }],
+      });
+
       setWalletStatus(`Payment sent! Transaction: ${txHash.slice(0, 10)}...`);
+
+      // Wait a moment for transaction to be included
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Retry summary request with payment proof
       setWalletStatus('Verifying payment and getting summary...');
@@ -163,7 +177,7 @@ export default function Summarizer() {
           Powered by Gemini AI on Sei Testnet
         </p>
         <p className="text-purple-300 text-sm mt-2">
-          ⚡ Pay-per-use with x402 Protocol
+          ⚡ Pay-per-use with x402 Protocol via MetaMask
         </p>
       </div>
 
@@ -219,7 +233,7 @@ export default function Summarizer() {
               Payment Required on Sei Testnet
             </h3>
             <p className="text-yellow-100 mb-2">
-              Price: <strong>{paymentInfo?.price || '$0.01'}</strong> (~0.01 SEI)
+              Price: <strong>{paymentInfo?.price || '$0.01'}</strong> (0.01 SEI)
             </p>
             <p className="text-yellow-100 mb-4 text-sm">
               Recipient: <code className="bg-black/30 px-2 py-1 rounded">{paymentInfo?.walletAddress}</code>
@@ -227,7 +241,7 @@ export default function Summarizer() {
             <button
               onClick={handleWalletConnect}
               disabled={loading}
-              className="w-full bg-gradient-to-r from-green-400 to-blue-500 text-white font-bold py-3 px-6 rounded-xl hover:from-green-500 hover:to-blue-600 disabled:from-gray-400 disabled:to-gray-500 transition-all duration-300 flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-orange-400 to-pink-500 text-white font-bold py-3 px-6 rounded-xl hover:from-orange-500 hover:to-pink-600 disabled:from-gray-400 disabled:to-gray-500 transition-all duration-300 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -237,12 +251,12 @@ export default function Summarizer() {
               ) : (
                 <>
                   <Wallet className="w-5 h-5" />
-                  <span>Connect Wallet & Pay with Keplr/Leap</span>
+                  <span>Connect MetaMask & Pay</span>
                 </>
               )}
             </button>
             <p className="text-yellow-200 text-xs mt-3 text-center">
-              💡 Make sure you have Keplr or Leap wallet installed with Sei Testnet configured
+              🦊 MetaMask will prompt you to add Sei Testnet and approve the transaction
             </p>
           </div>
         )}
@@ -272,7 +286,7 @@ export default function Summarizer() {
       {/* Footer */}
       <div className="text-center mt-8 text-purple-200 text-sm">
         <p>Built with React + Hono + Gemini AI + x402 Protocol</p>
-        <p className="text-purple-300 text-xs mt-1">Real Sei Testnet payments via Keplr/Leap</p>
+        <p className="text-purple-300 text-xs mt-1">Pay with MetaMask on Sei Testnet EVM</p>
       </div>
     </div>
   );
