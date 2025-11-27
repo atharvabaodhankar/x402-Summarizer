@@ -1,19 +1,36 @@
 import { useState } from 'react';
-import { Sparkles, Loader2, AlertCircle, Wallet, CheckCircle } from 'lucide-react';
+import { Sparkles, Loader2, AlertCircle, Wallet, CheckCircle, Network } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
-// Sei Testnet EVM Configuration
-const SEI_TESTNET_EVM = {
-  chainId: '0x531', // 1329 in hex (Sei Atlantic-2 Testnet)
-  chainName: 'Sei Testnet',
-  nativeCurrency: {
-    name: 'SEI',
-    symbol: 'SEI',
-    decimals: 18
+// Network configurations
+const NETWORKS = {
+  sei: {
+    chainId: '0x531', // 1329 in hex
+    chainName: 'Sei Testnet',
+    nativeCurrency: {
+      name: 'SEI',
+      symbol: 'SEI',
+      decimals: 18
+    },
+    rpcUrls: ['https://evm-rpc-testnet.sei-apis.com'],
+    blockExplorerUrls: ['https://seitrace.com'],
+    faucet: 'https://atlantic-2.app.sei.io/faucet',
+    paymentAmount: '0x2386F26FC10000', // 0.01 SEI in wei
   },
-  rpcUrls: ['https://evm-rpc-testnet.sei-apis.com'],
-  blockExplorerUrls: ['https://seitrace.com']
+  sepolia: {
+    chainId: '0xaa36a7', // 11155111 in hex
+    chainName: 'Sepolia Testnet',
+    nativeCurrency: {
+      name: 'Ethereum',
+      symbol: 'ETH',
+      decimals: 18
+    },
+    rpcUrls: ['https://rpc.sepolia.org'],
+    blockExplorerUrls: ['https://sepolia.etherscan.io'],
+    faucet: 'https://sepoliafaucet.com',
+    paymentAmount: '0x2386F26FC10000', // 0.01 ETH in wei
+  }
 };
 
 export default function Summarizer() {
@@ -24,6 +41,9 @@ export default function Summarizer() {
   const [paymentRequired, setPaymentRequired] = useState(false);
   const [paymentInfo, setPaymentInfo] = useState(null);
   const [walletStatus, setWalletStatus] = useState('');
+  const [selectedNetwork, setSelectedNetwork] = useState('sei');
+
+  const currentNetwork = NETWORKS[selectedNetwork];
 
   const handleSummarize = async () => {
     if (!text.trim()) {
@@ -88,19 +108,19 @@ export default function Summarizer() {
 
       setWalletStatus(`Connected: ${senderAddress.slice(0, 10)}...`);
 
-      // Try to switch to Sei Testnet, or add it if not present
+      // Try to switch to selected network, or add it if not present
       try {
         await window.ethereum.request({
           method: 'wallet_switchEthereumChain',
-          params: [{ chainId: SEI_TESTNET_EVM.chainId }],
+          params: [{ chainId: currentNetwork.chainId }],
         });
       } catch (switchError) {
         // Chain not added, let's add it
         if (switchError.code === 4902) {
-          setWalletStatus('Adding Sei Testnet to MetaMask...');
+          setWalletStatus(`Adding ${currentNetwork.chainName} to MetaMask...`);
           await window.ethereum.request({
             method: 'wallet_addEthereumChain',
-            params: [SEI_TESTNET_EVM],
+            params: [currentNetwork],
           });
         } else {
           throw switchError;
@@ -110,8 +130,7 @@ export default function Summarizer() {
       setWalletStatus('Preparing payment transaction...');
 
       const recipient = paymentInfo.walletAddress;
-      // 0.01 SEI in wei (18 decimals)
-      const amountWei = '0x2386F26FC10000'; // 0.01 SEI
+      const amountWei = currentNetwork.paymentAmount;
 
       setWalletStatus('Please approve transaction in MetaMask...');
 
@@ -139,6 +158,7 @@ export default function Summarizer() {
         headers: {
           'Content-Type': 'application/json',
           'X-Payment-TxHash': txHash,
+          'X-Payment-Network': selectedNetwork,
         },
         body: JSON.stringify({ text }),
       });
@@ -174,7 +194,7 @@ export default function Summarizer() {
           </h1>
         </div>
         <p className="text-purple-200 text-lg">
-          Powered by Gemini AI on Sei Testnet
+          Powered by Gemini AI
         </p>
         <p className="text-purple-300 text-sm mt-2">
           ⚡ Pay-per-use with x402 Protocol via MetaMask
@@ -183,6 +203,40 @@ export default function Summarizer() {
 
       {/* Main Card */}
       <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl p-8 border border-white/20">
+        {/* Network Selector */}
+        <div className="mb-6">
+          <label className="block text-white text-sm font-semibold mb-3 flex items-center gap-2">
+            <Network className="w-4 h-4" />
+            Select Payment Network
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => setSelectedNetwork('sei')}
+              disabled={loading}
+              className={`p-4 rounded-xl border-2 transition-all ${
+                selectedNetwork === 'sei'
+                  ? 'bg-purple-500/30 border-purple-400 text-white'
+                  : 'bg-white/5 border-white/20 text-purple-200 hover:bg-white/10'
+              }`}
+            >
+              <div className="font-bold">Sei Testnet</div>
+              <div className="text-xs mt-1">EVM Compatible</div>
+            </button>
+            <button
+              onClick={() => setSelectedNetwork('sepolia')}
+              disabled={loading}
+              className={`p-4 rounded-xl border-2 transition-all ${
+                selectedNetwork === 'sepolia'
+                  ? 'bg-blue-500/30 border-blue-400 text-white'
+                  : 'bg-white/5 border-white/20 text-purple-200 hover:bg-white/10'
+              }`}
+            >
+              <div className="font-bold">Sepolia Testnet</div>
+              <div className="text-xs mt-1">Ethereum L2</div>
+            </button>
+          </div>
+        </div>
+
         {/* Wallet Status */}
         {walletStatus && (
           <div className="mb-4 bg-blue-500/20 backdrop-blur border border-blue-500/50 rounded-xl p-3 flex items-center gap-2">
@@ -230,13 +284,13 @@ export default function Summarizer() {
           <div className="mt-6 bg-yellow-500/20 backdrop-blur border border-yellow-500/50 rounded-xl p-6">
             <h3 className="text-yellow-200 text-xl font-semibold mb-3 flex items-center gap-2">
               <Wallet className="w-6 h-6" />
-              Payment Required on Sei Testnet
+              Payment Required on {currentNetwork.chainName}
             </h3>
             <p className="text-yellow-100 mb-2">
-              Price: <strong>{paymentInfo?.price || '$0.01'}</strong> (0.01 SEI)
+              Price: <strong>{paymentInfo?.price || '$0.01'}</strong> (0.01 {currentNetwork.nativeCurrency.symbol})
             </p>
             <p className="text-yellow-100 mb-4 text-sm">
-              Recipient: <code className="bg-black/30 px-2 py-1 rounded">{paymentInfo?.walletAddress}</code>
+              Recipient: <code className="bg-black/30 px-2 py-1 rounded text-xs">{paymentInfo?.walletAddress}</code>
             </p>
             <button
               onClick={handleWalletConnect}
@@ -255,9 +309,19 @@ export default function Summarizer() {
                 </>
               )}
             </button>
-            <p className="text-yellow-200 text-xs mt-3 text-center">
-              🦊 MetaMask will prompt you to add Sei Testnet and approve the transaction
-            </p>
+            <div className="mt-3 p-3 bg-black/20 rounded-lg">
+              <p className="text-yellow-200 text-xs text-center mb-1">
+                🦊 MetaMask will prompt you to add {currentNetwork.chainName}
+              </p>
+              <a 
+                href={currentNetwork.faucet} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-300 hover:text-blue-200 text-xs block text-center underline"
+              >
+                Need testnet tokens? Visit faucet →
+              </a>
+            </div>
           </div>
         )}
 
@@ -286,7 +350,9 @@ export default function Summarizer() {
       {/* Footer */}
       <div className="text-center mt-8 text-purple-200 text-sm">
         <p>Built with React + Hono + Gemini AI + x402 Protocol</p>
-        <p className="text-purple-300 text-xs mt-1">Pay with MetaMask on Sei Testnet EVM</p>
+        <p className="text-purple-300 text-xs mt-1">
+          Pay with MetaMask on Sei or Sepolia Testnet
+        </p>
       </div>
     </div>
   );
