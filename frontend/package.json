@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@chain-registry/client": "^2.0.111",
     "@cosmos-kit/keplr": "^2.15.9",
     "@cosmos-kit/leap": "^2.15.8",
     "@cosmos-kit/react": "^2.22.7",

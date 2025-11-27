@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, Loader2, AlertCircle, Wallet } from 'lucide-react';
+import { Sparkles, Loader2, AlertCircle, Wallet, CheckCircle } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
@@ -10,6 +10,7 @@ export default function Summarizer() {
   const [error, setError] = useState('');
   const [paymentRequired, setPaymentRequired] = useState(false);
   const [paymentInfo, setPaymentInfo] = useState(null);
+  const [walletStatus, setWalletStatus] = useState('');
 
   const handleSummarize = async () => {
     if (!text.trim()) {
@@ -21,6 +22,7 @@ export default function Summarizer() {
     setError('');
     setSummary('');
     setPaymentRequired(false);
+    setWalletStatus('');
 
     try {
       const response = await fetch(`${BACKEND_URL}/summarize`, {
@@ -37,7 +39,6 @@ export default function Summarizer() {
       if (response.status === 402) {
         setPaymentRequired(true);
         setPaymentInfo(data);
-        setError(`💰 Payment Required: ${data.price || '$0.01'} on Sei Testnet. Please connect your wallet to continue.`);
         return;
       }
 
@@ -56,36 +57,96 @@ export default function Summarizer() {
   const handleWalletConnect = async () => {
     setLoading(true);
     setError('');
-    
-    // Simulate wallet connection and payment
-    setTimeout(async () => {
-      try {
-        // Simulate payment by including a demo payment header
-        const response = await fetch(`${BACKEND_URL}/summarize`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Payment-TxHash': 'demo-payment-' + Date.now(), // Demo payment proof
-          },
-          body: JSON.stringify({ text }),
-        });
+    setWalletStatus('Detecting wallet...');
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to summarize');
-        }
-
-        // Payment successful!
-        setPaymentRequired(false);
-        setSummary(data.summary);
-        setError('');
-      } catch (err) {
-        setError('Payment failed: ' + err.message);
-      } finally {
-        setLoading(false);
+    try {
+      // Check if Keplr is installed
+      if (!window.keplr && !window.leap) {
+        throw new Error('Please install Keplr or Leap wallet extension');
       }
-    }, 2000); // 2 second delay to simulate wallet transaction
+
+      const wallet = window.keplr || window.leap;
+      setWalletStatus('Connecting to Sei Testnet...');
+
+      // Enable Sei Testnet
+      const chainId = 'atlantic-2'; // Sei Testnet
+      
+      try {
+        await wallet.enable(chainId);
+      } catch (e) {
+        // If chain not found, suggest adding it
+        throw new Error('Please add Sei Testnet to your wallet. Chain ID: atlantic-2');
+      }
+
+      setWalletStatus('Getting wallet address...');
+      const offlineSigner = await wallet.getOfflineSigner(chainId);
+      const accounts = await offlineSigner.getAccounts();
+      const senderAddress = accounts[0].address;
+
+      setWalletStatus(`Connected: ${senderAddress.slice(0, 10)}...`);
+
+      // Create payment transaction
+      setWalletStatus('Preparing payment transaction...');
+      
+      const recipient = paymentInfo.walletAddress;
+      const amount = '10000'; // 0.01 SEI in usei (smallest unit)
+
+      setWalletStatus('Please approve transaction in your wallet...');
+
+      // Sign and broadcast transaction
+      const tx = await wallet.signAndBroadcast(
+        chainId,
+        senderAddress,
+        [{
+          typeUrl: '/cosmos.bank.v1beta1.MsgSend',
+          value: {
+            fromAddress: senderAddress,
+            toAddress: recipient,
+            amount: [{
+              denom: 'usei',
+              amount: amount,
+            }],
+          },
+        }],
+        {
+          amount: [{ denom: 'usei', amount: '5000' }],
+          gas: '200000',
+        }
+      );
+
+      const txHash = tx.transactionHash;
+      setWalletStatus(`Payment sent! Transaction: ${txHash.slice(0, 10)}...`);
+
+      // Retry summary request with payment proof
+      setWalletStatus('Verifying payment and getting summary...');
+      
+      const response = await fetch(`${BACKEND_URL}/summarize`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Payment-TxHash': txHash,
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to summarize after payment');
+      }
+
+      // Success!
+      setPaymentRequired(false);
+      setSummary(data.summary);
+      setWalletStatus('✅ Payment verified and summary received!');
+      setTimeout(() => setWalletStatus(''), 3000);
+      
+    } catch (err) {
+      setError('Wallet error: ' + err.message);
+      setWalletStatus('');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -108,6 +169,14 @@ export default function Summarizer() {
 
       {/* Main Card */}
       <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl p-8 border border-white/20">
+        {/* Wallet Status */}
+        {walletStatus && (
+          <div className="mb-4 bg-blue-500/20 backdrop-blur border border-blue-500/50 rounded-xl p-3 flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-blue-300" />
+            <p className="text-blue-100 text-sm">{walletStatus}</p>
+          </div>
+        )}
+
         {/* Input Section */}
         <div className="mb-6">
           <label htmlFor="text-input" className="block text-white text-lg font-semibold mb-3">
@@ -129,10 +198,10 @@ export default function Summarizer() {
           disabled={loading || !text.trim()}
           className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-bold py-4 px-6 rounded-xl hover:from-yellow-500 hover:to-orange-600 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3 shadow-lg"
         >
-          {loading ? (
+          {loading && !paymentRequired ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Summarizing...</span>
+              <span>Processing...</span>
             </>
           ) : (
             <>
@@ -149,21 +218,37 @@ export default function Summarizer() {
               <Wallet className="w-6 h-6" />
               Payment Required on Sei Testnet
             </h3>
-            <p className="text-yellow-100 mb-4">
-              Price: <strong>{paymentInfo?.price || '$0.01'}</strong>
+            <p className="text-yellow-100 mb-2">
+              Price: <strong>{paymentInfo?.price || '$0.01'}</strong> (~0.01 SEI)
+            </p>
+            <p className="text-yellow-100 mb-4 text-sm">
+              Recipient: <code className="bg-black/30 px-2 py-1 rounded">{paymentInfo?.walletAddress}</code>
             </p>
             <button
               onClick={handleWalletConnect}
-              className="w-full bg-gradient-to-r from-green-400 to-blue-500 text-white font-bold py-3 px-6 rounded-xl hover:from-green-500 hover:to-blue-600 transition-all duration-300 flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-green-400 to-blue-500 text-white font-bold py-3 px-6 rounded-xl hover:from-green-500 hover:to-blue-600 disabled:from-gray-400 disabled:to-gray-500 transition-all duration-300 flex items-center justify-center gap-2"
             >
-              <Wallet className="w-5 h-5" />
-              Connect Wallet & Pay
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Processing payment...</span>
+                </>
+              ) : (
+                <>
+                  <Wallet className="w-5 h-5" />
+                  <span>Connect Wallet & Pay with Keplr/Leap</span>
+                </>
+              )}
             </button>
+            <p className="text-yellow-200 text-xs mt-3 text-center">
+              💡 Make sure you have Keplr or Leap wallet installed with Sei Testnet configured
+            </p>
           </div>
         )}
 
         {/* Error Message */}
-        {error && !paymentRequired && (
+        {error && (
           <div className="mt-6 bg-red-500/20 backdrop-blur border border-red-500/50 rounded-xl p-4 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-300 flex-shrink-0 mt-0.5" />
             <p className="text-red-100">{error}</p>
@@ -187,6 +272,7 @@ export default function Summarizer() {
       {/* Footer */}
       <div className="text-center mt-8 text-purple-200 text-sm">
         <p>Built with React + Hono + Gemini AI + x402 Protocol</p>
+        <p className="text-purple-300 text-xs mt-1">Real Sei Testnet payments via Keplr/Leap</p>
       </div>
     </div>
   );
