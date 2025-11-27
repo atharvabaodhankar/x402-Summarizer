@@ -54,7 +54,38 @@ export default function Summarizer() {
   };
 
   const handleWalletConnect = async () => {
-    setError('🔗 Wallet integration coming soon! For now, the x402 middleware is detecting payment requirements. To enable full wallet flow, you would need to integrate @cosmos-kit/react or Keplr/Leap wallet providers.');
+    setLoading(true);
+    setError('');
+    
+    // Simulate wallet connection and payment
+    setTimeout(async () => {
+      try {
+        // Simulate payment by including a demo payment header
+        const response = await fetch(`${BACKEND_URL}/summarize`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Payment-TxHash': 'demo-payment-' + Date.now(), // Demo payment proof
+          },
+          body: JSON.stringify({ text }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to summarize');
+        }
+
+        // Payment successful!
+        setPaymentRequired(false);
+        setSummary(data.summary);
+        setError('');
+      } catch (err) {
+        setError('Payment failed: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    }, 2000); // 2 second delay to simulate wallet transaction
   };
 
   return (
